@@ -1,0 +1,172 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Source+Code+Pro:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#0f1724;
+  --card:#0b1220;
+  --muted:#94a3b8;
+  --accent:#60a5fa;
+  --accent-2:#7c3aed;
+  --glass: rgba(255,255,255,0.04);
+}
+
+*{box-sizing:border-box}
+html{min-height:100%;}
+body{
+  min-height:100vh;
+  margin:0;
+  font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  background: radial-gradient(1200px 600px at 10% 10%, rgba(96,165,250,0.08), transparent),
+              linear-gradient(180deg, rgba(12,18,28,1) 0%, rgba(6,8,12,1) 100%);
+  color:#e6eef8;
+  padding:32px 32px 48px;
+}
+.container{
+  max-width:1000px;
+  margin:0 auto;
+}
+header{margin-bottom:18px}
+header h1{margin:0;font-size:28px}
+header p{margin:6px 0 0;color:var(--muted)}
+
+main{
+  display:block;
+  gap:20px;
+}
+
+.editor{
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius:12px;
+  padding:18px;
+  box-shadow: 0 6px 30px rgba(2,6,23,0.6);
+}
+.editor textarea{
+  width:100%;
+  min-height:420px;
+  background:rgba(15,23,36,0.96);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;
+  padding:18px;
+  font-size:16px;
+  line-height:1.75;
+  color:#f8fafc;
+  font-family:'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  resize:vertical;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+}
+.editor-content{
+  width:100%;
+  min-height:420px;
+  background:rgba(15,23,36,0.96);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;
+  padding:18px;
+  font-size:16px;
+  line-height:1.75;
+  color:#f8fafc;
+  font-family:'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+  outline: none;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+.editor-content img{
+  max-width:100%;
+  border-radius:10px;
+  display:block;
+  margin:10px auto;
+  max-height:300px;
+}
+.editor-content[contenteditable]:empty:before{
+  content: attr(placeholder);
+  color: rgba(148,163,184,0.6);
+}
+.controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:12px}
+button{background:linear-gradient(90deg,var(--accent),var(--accent-2));border:none;padding:10px 16px;border-radius:10px;color:#07203a;font-weight:600;cursor:pointer}
+button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+.status{margin-left:auto;color:var(--muted);font-size:13px}
+
+.notes{
+  background:var(--card);
+  padding:20px;
+  border-radius:20px;
+  box-shadow: 0 10px 40px rgba(2,6,23,0.5);
+  overflow:visible;
+}
+.notes h2{margin-top:0;font-size:22px;letter-spacing:0.02em}
+.group{margin-bottom:16px}
+.group h3{margin:0 0 12px 0;color:var(--accent);font-size:15px;text-transform:uppercase;letter-spacing:0.08em}
+.note{
+  background:rgba(255,255,255,0.04);
+  padding:16px;
+  border-radius:16px;
+  margin-bottom:12px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:14px;
+  align-items:start;
+  border:1px solid rgba(255,255,255,0.08);
+}
+.note-header{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.note .meta{
+  font-size:12px;
+  color:var(--muted);
+}
+.note .content{
+  width:100%;
+  white-space:pre-wrap;
+  word-break:break-word;
+  overflow-wrap:break-word;
+  line-height:1.8;
+  letter-spacing:0.01em;
+  font-size:14px;
+}
+
+.note .content img{
+  max-width:100%;
+  border-radius:10px;
+  display:block;
+  margin:10px auto;
+  max-height:300px;
+}
+.note .actions{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  justify-content:flex-start;
+}
+.note button{
+  padding:8px 10px;
+  border-radius:10px;
+  font-size:13px;
+  min-width:90px;
+}
+.note button:hover{
+  opacity:0.95;
+}
+
+.notes {
+  overflow: visible;
+}
+
+.notes::-webkit-scrollbar {
+  width: 10px;
+}
+.notes::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.04);
+  border-radius: 10px;
+}
+.notes::-webkit-scrollbar-thumb {
+  background: rgba(96,165,250,0.35);
+  border-radius: 10px;
+}
+
+footer{margin-top:18px;color:var(--muted);text-align:center}
+
+@media (max-width:900px){
+  main{grid-template-columns:1fr;}
+  .editor textarea{height:300px}
+}

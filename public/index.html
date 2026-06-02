@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Notas</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Minhas Notas</h1>
+      <p>Escreva suas notas no bloco abaixo e salve por data e hora.</p>
+    </header>
+
+    <main>
+      <section class="editor">
+        <div id="noteContent" contenteditable="true" class="editor-content" placeholder="Digite sua nota aqui..."></div>
+        <div class="controls">
+          <button id="saveBtn">Salvar</button>
+          <button id="clearBtn" class="secondary">Limpar</button>
+          <button id="insertImageBtn" class="secondary">Inserir imagem</button>
+          <input id="imageInput" type="file" accept="image/*" style="display:none" />
+          <div id="status" class="status"></div>
+        </div>
+      </section>
+
+      <section class="notes">
+        <h2>Notas</h2>
+        <div id="notesList"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
