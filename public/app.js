@@ -1,8 +1,19 @@
 let editingId = null;
 
 async function fetchNotes() {
-  const res = await fetch('/api/notes');
-  return res.json();
+  try {
+    const res = await fetch('/api/notes');
+    if (!res.ok) {
+      console.error('Erro ao buscar notas:', res.status, res.statusText);
+      return [];
+    }
+    const data = await res.json();
+    console.log('Notas carregadas:', data.length, 'registros');
+    return data;
+  } catch (err) {
+    console.error('Erro na requisição de notas:', err);
+    return [];
+  }
 }
 
 function formatDate(iso) {
@@ -28,43 +39,48 @@ function groupByDay(notes) {
 function el(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; }
 
 async function loadNotes() {
-  const notes = await fetchNotes();
-  const list = document.getElementById('notesList');
-  list.innerHTML = '';
-  const groups = groupByDay(notes);
-  for (const day of Object.keys(groups)) {
-    const gdiv = el('div', 'group');
-    gdiv.appendChild(el('h3', '', day));
-    for (const note of groups[day]) {
-      const ndiv = el('div', 'note');
-      const header = el('div', 'note-header');
-      const meta = el('div', 'meta', formatDate(note.created_at));
-      if (note.updated_at) meta.textContent += ' • editado ' + new Date(note.updated_at).toLocaleString();
-      const content = el('div', 'content');
-      content.innerHTML = note.content;
-      const actions = el('div', 'actions');
-      const editBtn = el('button', '', 'Editar');
-      const delBtn = el('button', '', 'Excluir');
-      editBtn.onclick = () => { 
-        document.getElementById('noteContent').innerHTML = note.content; 
-        editingId = note.id; 
-        document.getElementById('status').textContent = 'Editando nota'; 
-        window.scrollTo({top:0,behavior:'smooth'}); 
-      };
-      delBtn.onclick = async () => {
-        if (!confirm('Excluir esta nota?')) return;
-        await fetch('/api/notes/' + note.id, { method: 'DELETE' });
-        await loadNotes();
-      };
-      actions.appendChild(editBtn);
-      actions.appendChild(delBtn);
-      header.appendChild(meta);
-      header.appendChild(content);
-      ndiv.appendChild(header);
-      ndiv.appendChild(actions);
-      gdiv.appendChild(ndiv);
+  try {
+    const notes = await fetchNotes();
+    const list = document.getElementById('notesList');
+    list.innerHTML = '';
+    const groups = groupByDay(notes);
+    console.log('Grupos de notas:', Object.keys(groups).length);
+    for (const day of Object.keys(groups)) {
+      const gdiv = el('div', 'group');
+      gdiv.appendChild(el('h3', '', day));
+      for (const note of groups[day]) {
+        const ndiv = el('div', 'note');
+        const header = el('div', 'note-header');
+        const meta = el('div', 'meta', formatDate(note.created_at));
+        if (note.updated_at) meta.textContent += ' • editado ' + new Date(note.updated_at).toLocaleString();
+        const content = el('div', 'content');
+        content.innerHTML = note.content;
+        const actions = el('div', 'actions');
+        const editBtn = el('button', '', 'Editar');
+        const delBtn = el('button', '', 'Excluir');
+        editBtn.onclick = () => { 
+          document.getElementById('noteContent').innerHTML = note.content; 
+          editingId = note.id; 
+          document.getElementById('status').textContent = 'Editando nota'; 
+          window.scrollTo({top:0,behavior:'smooth'}); 
+        };
+        delBtn.onclick = async () => {
+          if (!confirm('Excluir esta nota?')) return;
+          await fetch('/api/notes/' + note.id, { method: 'DELETE' });
+          await loadNotes();
+        };
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+        header.appendChild(meta);
+        header.appendChild(content);
+        ndiv.appendChild(header);
+        ndiv.appendChild(actions);
+        gdiv.appendChild(ndiv);
+      }
+      list.appendChild(gdiv);
     }
-    list.appendChild(gdiv);
+  } catch (err) {
+    console.error('Erro ao carregar notas:', err);
   }
 }
 
@@ -76,18 +92,33 @@ async function saveNote() {
   const status = document.getElementById('status');
   if (!content || content === '') { status.textContent = 'Digite algo antes de salvar.'; return; }
   status.textContent = 'Salvando...';
-  if (editingId) {
-    const res = await fetch('/api/notes/' + editingId, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content }) });
-    if (!res.ok) { status.textContent = 'Erro ao atualizar.'; return; }
-    editingId = null;
-  } else {
-    const res = await fetch('/api/notes', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content }) });
-    if (!res.ok) { status.textContent = 'Erro ao salvar.'; return; }
+  try {
+    if (editingId) {
+      const res = await fetch('/api/notes/' + editingId, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content }) });
+      if (!res.ok) { 
+        console.error('Erro ao atualizar nota:', res.status, res.statusText);
+        status.textContent = 'Erro ao atualizar.'; 
+        return; 
+      }
+      console.log('Nota atualizada com sucesso');
+      editingId = null;
+    } else {
+      const res = await fetch('/api/notes', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content }) });
+      if (!res.ok) { 
+        console.error('Erro ao salvar nota:', res.status, res.statusText);
+        status.textContent = 'Erro ao salvar.'; 
+        return; 
+      }
+      console.log('Nota salva com sucesso');
+    }
+    editor.innerHTML = '';
+    status.textContent = 'Salvo com sucesso.';
+    setTimeout(()=> status.textContent = '', 2000);
+    await loadNotes();
+  } catch (err) {
+    console.error('Erro durante save:', err);
+    status.textContent = 'Erro ao salvar nota.';
   }
-  editor.innerHTML = '';
-  status.textContent = 'Salvo com sucesso.';
-  setTimeout(()=> status.textContent = '', 2000);
-  await loadNotes();
 }
 
 function clearEditor(){ 

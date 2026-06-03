@@ -26,7 +26,11 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 const dbFile = path.join(__dirname, 'notes.db');
-const db = new sqlite3.Database(dbFile);
+console.log('Banco de dados em:', dbFile);
+const db = new sqlite3.Database(dbFile, (err) => {
+  if (err) console.error('Erro ao abrir banco:', err);
+  else console.log('Banco de dados conectado');
+});
 
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS notes (
@@ -34,13 +38,20 @@ db.serialize(() => {
     content TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT
-  )`);
+  )`, (err) => {
+    if (err) console.error('Erro ao criar tabela:', err);
+    else console.log('Tabela de notas verificada/criada');
+  });
 });
 
 app.get('/api/notes', (req, res) => {
   db.all('SELECT * FROM notes ORDER BY created_at DESC', (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+    if (err) {
+      console.error('Erro ao buscar notas:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log('GET /api/notes - retornando', rows.length, 'notas');
+    res.json(rows || []);
   });
 });
 
@@ -50,10 +61,18 @@ app.post('/api/notes', (req, res) => {
     return res.status(400).json({ error: 'Conteúdo vazio' });
   }
   const created_at = new Date().toISOString();
+  console.log('POST /api/notes - salvando nova nota');
   db.run('INSERT INTO notes (content, created_at) VALUES (?, ?)', [content, created_at], function (err) {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) {
+      console.error('Erro ao inserir nota:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log('Nota inserida com ID:', this.lastID);
     db.get('SELECT * FROM notes WHERE id = ?', [this.lastID], (err2, row) => {
-      if (err2) return res.status(500).json({ error: err2.message });
+      if (err2) {
+        console.error('Erro ao buscar nota inserida:', err2);
+        return res.status(500).json({ error: err2.message });
+      }
       res.status(201).json(row);
     });
   });
