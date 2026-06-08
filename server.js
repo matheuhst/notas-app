@@ -216,7 +216,9 @@ function getUploadFilesFromContent(content) {
 
 app.delete('/api/notes/:id', (req, res) => {
   const id = req.params.id;
-  db.get('SELECT content FROM notes WHERE id = ?', [id], (err, row) => {
+  const selectQuery = isProduction ? 'SELECT content FROM notes WHERE id = $1' : 'SELECT content FROM notes WHERE id = ?';
+  const params = isProduction ? [id] : [id];
+  db.get(selectQuery, params, (err, row) => {
     if (err) {
       console.error('Erro ao buscar nota para deletar:', err);
       return res.status(500).json({ error: err.message });
