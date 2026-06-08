@@ -1,6 +1,5 @@
 const express = require('express');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
 const bodyParser = require('body-parser');
 const multer = require('multer');
 const fs = require('fs');
@@ -25,27 +24,93 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-const dbFile = path.join(__dirname, 'notes.db');
-console.log('Banco de dados em:', dbFile);
-const db = new sqlite3.Database(dbFile, (err) => {
-  if (err) console.error('Erro ao abrir banco:', err);
-  else console.log('Banco de dados conectado');
-});
+// Database initialization
+let db;
+const isProduction = process.env.DATABASE_URL;
 
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    content TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT
-  )`, (err) => {
-    if (err) console.error('Erro ao criar tabela:', err);
-    else console.log('Tabela de notas verificada/criada');
+if (isProduction) {
+  // PostgreSQL em produção
+  const { Pool } = require('pg');
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
   });
-});
+  
+  db = {
+    all: (query, params, callback) => {
+      pool.query(query, params, (err, result) => {
+        if (err) return callback(err, null);
+        callback(null, result.rows);
+      });
+    },
+    get: (query, params, callback) => {
+      pool.query(query, params, (err, result) => {
+        if (err) return callback(err, null);
+        callback(null, result.rows[0]);
+      });
+    },
+    run: (query, params, callback) => {
+      pool.query(query, params, (err, result) => {
+        if (err) return callback(err);
+        if (typeof callback === 'function') {
+          callback.call({ lastID: result.rows[0]?.id }, err);
+        }
+      });
+    }
+  };
+  
+  // Create table PostgreSQL
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS notes (
+      id SERIAL PRIMARY KEY,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT
+    )
+  `, (err) => {
+    if (err) console.error('Erro ao criar tabela PostgreSQL:', err);
+    else console.log('Tabela PostgreSQL verificada/criada');
+  });
+  
+  console.log('Usando PostgreSQL');
+} else {
+  // SQLite em desenvolvimento
+  const sqlite3 = require('sqlite3').verbose();
+  const dbFile = path.join(__dirname, 'notes.db');
+  console.log('Usando SQLite em:', dbFile);
+  
+  const sqlite_db = new sqlite3.Database(dbFile, (err) => {
+    if (err) console.error('Erro ao abrir banco SQLite:', err);
+    else console.log('Banco SQLite conectado');
+  });
+  
+  sqlite_db.serialize(() => {
+    sqlite_db.run(`CREATE TABLE IF NOT EXISTS notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT
+    )`, (err) => {
+      if (err) console.error('Erro ao criar tabela SQLite:', err);
+      else console.log('Tabela SQLite verificada/criada');
+    });
+  });
+  
+  db = {
+    all: (query, params, callback) => {
+      sqlite_db.all(query, params, callback);
+    },
+    get: (query, params, callback) => {
+      sqlite_db.get(query, params, callback);
+    },
+    run: (query, params, callback) => {
+      sqlite_db.run(query, params, callback);
+    }
+  };
+}
 
 app.get('/api/notes', (req, res) => {
-  db.all('SELECT * FROM notes ORDER BY created_at DESC', (err, rows) => {
+  db.all('SELECT * FROM notes ORDER BY created_at DESC', [], (err, rows) => {
     if (err) {
       console.error('Erro ao buscar notas:', err);
       return res.status(500).json({ error: err.message });
@@ -62,20 +127,38 @@ app.post('/api/notes', (req, res) => {
   }
   const created_at = new Date().toISOString();
   console.log('POST /api/notes - salvando nova nota');
-  db.run('INSERT INTO notes (content, created_at) VALUES (?, ?)', [content, created_at], function (err) {
-    if (err) {
-      console.error('Erro ao inserir nota:', err);
-      return res.status(500).json({ error: err.message });
-    }
-    console.log('Nota inserida com ID:', this.lastID);
-    db.get('SELECT * FROM notes WHERE id = ?', [this.lastID], (err2, row) => {
-      if (err2) {
-        console.error('Erro ao buscar nota inserida:', err2);
-        return res.status(500).json({ error: err2.message });
+  
+  if (isProduction) {
+    const query = 'INSERT INTO notes (content, created_at) VALUES ($1, $2) RETURNING *';
+    db.run(query, [content, created_at], (err) => {
+      if (err) {
+        console.error('Erro ao inserir nota:', err);
+        return res.status(500).json({ error: err.message });
       }
-      res.status(201).json(row);
+      db.get('SELECT * FROM notes ORDER BY id DESC LIMIT 1', [], (err2, row) => {
+        if (err2) {
+          console.error('Erro ao buscar nota inserida:', err2);
+          return res.status(500).json({ error: err2.message });
+        }
+        res.status(201).json(row);
+      });
     });
-  });
+  } else {
+    db.run('INSERT INTO notes (content, created_at) VALUES (?, ?)', [content, created_at], function (err) {
+      if (err) {
+        console.error('Erro ao inserir nota:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      console.log('Nota inserida com ID:', this.lastID);
+      db.get('SELECT * FROM notes WHERE id = ?', [this.lastID], (err2, row) => {
+        if (err2) {
+          console.error('Erro ao buscar nota inserida:', err2);
+          return res.status(500).json({ error: err2.message });
+        }
+        res.status(201).json(row);
+      });
+    });
+  }
 });
 
 app.put('/api/notes/:id', (req, res) => {
@@ -85,13 +168,37 @@ app.put('/api/notes/:id', (req, res) => {
     return res.status(400).json({ error: 'Conteúdo vazio' });
   }
   const updated_at = new Date().toISOString();
-  db.run('UPDATE notes SET content = ?, updated_at = ? WHERE id = ?', [content, updated_at, id], function (err) {
-    if (err) return res.status(500).json({ error: err.message });
-    db.get('SELECT * FROM notes WHERE id = ?', [id], (err2, row) => {
-      if (err2) return res.status(500).json({ error: err2.message });
-      res.json(row);
+  
+  if (isProduction) {
+    const query = 'UPDATE notes SET content = $1, updated_at = $2 WHERE id = $3';
+    db.run(query, [content, updated_at, id], (err) => {
+      if (err) {
+        console.error('Erro ao atualizar nota:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      db.get('SELECT * FROM notes WHERE id = $1', [id], (err2, row) => {
+        if (err2) {
+          console.error('Erro ao buscar nota atualizada:', err2);
+          return res.status(500).json({ error: err2.message });
+        }
+        res.json(row);
+      });
     });
-  });
+  } else {
+    db.run('UPDATE notes SET content = ?, updated_at = ? WHERE id = ?', [content, updated_at, id], function (err) {
+      if (err) {
+        console.error('Erro ao atualizar nota:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      db.get('SELECT * FROM notes WHERE id = ?', [id], (err2, row) => {
+        if (err2) {
+          console.error('Erro ao buscar nota atualizada:', err2);
+          return res.status(500).json({ error: err2.message });
+        }
+        res.json(row);
+      });
+    });
+  }
 });
 
 function getUploadFilesFromContent(content) {
@@ -110,7 +217,10 @@ function getUploadFilesFromContent(content) {
 app.delete('/api/notes/:id', (req, res) => {
   const id = req.params.id;
   db.get('SELECT content FROM notes WHERE id = ?', [id], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) {
+      console.error('Erro ao buscar nota para deletar:', err);
+      return res.status(500).json({ error: err.message });
+    }
     if (!row) return res.status(404).json({ error: 'Nota não encontrada' });
 
     const uploads = getUploadFilesFromContent(row.content);
@@ -123,10 +233,23 @@ app.delete('/api/notes/:id', (req, res) => {
       }
     });
 
-    db.run('DELETE FROM notes WHERE id = ?', [id], function (err2) {
-      if (err2) return res.status(500).json({ error: err2.message });
-      res.json({ success: true });
-    });
+    if (isProduction) {
+      db.run('DELETE FROM notes WHERE id = $1', [id], (err2) => {
+        if (err2) {
+          console.error('Erro ao deletar nota:', err2);
+          return res.status(500).json({ error: err2.message });
+        }
+        res.json({ success: true });
+      });
+    } else {
+      db.run('DELETE FROM notes WHERE id = ?', [id], function (err2) {
+        if (err2) {
+          console.error('Erro ao deletar nota:', err2);
+          return res.status(500).json({ error: err2.message });
+        }
+        res.json({ success: true });
+      });
+    }
   });
 });
 
